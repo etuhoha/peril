@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
 
 	"github.com/etuhoha/peril/internal/gamelogic"
 	"github.com/etuhoha/peril/internal/pubsub"
@@ -32,7 +31,35 @@ func main() {
 	queueName := fmt.Sprintf("%v.%v", routing.PauseKey, username)
 	pubsub.DeclareAndBind(mqConnection, routing.ExchangePerilDirect, queueName, routing.PauseKey, pubsub.QueueTypeTransient)
 
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
+	state := gamelogic.NewGameState(username)
+	for {
+		cmd := gamelogic.GetInput()
+		cmdName := cmd[0]
+		switch cmdName {
+		case "spawn":
+			err = state.CommandSpawn(cmd)
+			if err != nil {
+				fmt.Printf("error executing '%v': %v\n", cmd, err)
+			}
+		case "move":
+			move, err := state.CommandMove(cmd)
+			if err != nil {
+				fmt.Printf("error executing '%v': %v\n", cmd, err)
+			}
+			for _, u := range move.Units {
+				fmt.Printf("Move %v(%v) -> %v\n", u.Rank, u.ID, move.ToLocation)
+			}
+		case "status":
+			state.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			fmt.Println("Spamming not allowed yet")
+		case "quit":
+			gamelogic.PrintQuit()
+			os.Exit(0)
+		default:
+			fmt.Printf("unknown command '%v'\n", cmdName)
+		}
+	}
 }

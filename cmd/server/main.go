@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/etuhoha/peril/internal/gamelogic"
 	"github.com/etuhoha/peril/internal/pubsub"
@@ -46,12 +47,10 @@ func main() {
 				log.Fatalf("could not send 'resume': %v", err)
 			}
 		case "quit":
-			goto exit
+			fmt.Printf("Stopping Peril server...\n")
+			os.Exit(0)
 		default:
 			fmt.Printf("unknown command '%v'\n", cmd)
 		}
 	}
-
-exit:
-	fmt.Printf("Stopping Peril server...\n")
 }
