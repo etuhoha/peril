@@ -38,7 +38,8 @@ func DeclareAndBind(
 	}
 
 	durable := queueType == QueueTypeDurable
-	queue, err := channel.QueueDeclare(queueName, durable, !durable, !durable, false, nil)
+	table := amqp.Table{"x-dead-letter-exchange": "peril_dlx"}
+	queue, err := channel.QueueDeclare(queueName, durable, !durable, !durable, false, table)
 	if err != nil {
 		return nil, amqp.Queue{}, err
 	}
@@ -51,13 +52,21 @@ func DeclareAndBind(
 	return channel, queue, nil
 }
 
+type AckType int
+
+const (
+	Ack = iota
+	NackRequeue
+	NackDiscard
+)
+
 func SubscribeJSON[T any](
 	conn *amqp.Connection,
 	exchange,
 	queueName,
 	key string,
 	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
-	handler func(T),
+	handler func(T) AckType,
 ) error {
 	channel, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -78,8 +87,20 @@ func SubscribeJSON[T any](
 				continue // panic?
 			}
 
-			handler(t)
-			delivery.Ack(false)
+			ack := handler(t)
+			switch ack {
+			case Ack:
+				log.Println("ACK")
+				delivery.Ack(false)
+			case NackRequeue:
+				log.Println("NACK requeue")
+				delivery.Nack(false, true)
+			case NackDiscard:
+				log.Println("NACK discard")
+				delivery.Nack(false, false)
+			default:
+				log.Fatalf("uncknown ack type %v\n", ack)
+			}
 		}
 	}()
 
