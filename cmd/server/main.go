@@ -21,12 +21,23 @@ func main() {
 		log.Fatalf("could not connect to MQ: %v", err)
 	}
 	defer mqConnection.Close()
-	fmt.Println("Connected to MQ...")
+	fmt.Println("Connected to MQ.")
 
 	mqChannel, err := mqConnection.Channel()
 	if err != nil {
 		log.Fatalf("could not create MQ channel: %v", err)
 	}
+
+	_, logQueue, err := pubsub.DeclareAndBind(
+		mqConnection,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
+		pubsub.QueueTypeDurable)
+	if err != nil {
+		log.Fatalf("could not create log queue: %v", err)
+	}
+	fmt.Printf("Log queue created: '%v'.\n", logQueue.Name)
 
 	gamelogic.PrintServerHelp()
 
