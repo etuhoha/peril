@@ -18,20 +18,31 @@ func main() {
 	connectionString := "amqp://guest:guest@localhost:5672/"
 	mqConnection, err := amqp.Dial(connectionString)
 	if err != nil {
-		log.Fatalf("could not connect to MQ: %v", err)
+		log.Fatalf("could not connect to MQ: %v\n", err)
 	}
 	defer mqConnection.Close()
-	fmt.Println("Connected to MQ...")
+	fmt.Println("Connected to MQ.")
 
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
-		log.Fatalf("could not log in: %v", err)
+		log.Fatalf("could not log in: %v\n", err)
 	}
 
-	queueName := fmt.Sprintf("%v.%v", routing.PauseKey, username)
-	pubsub.DeclareAndBind(mqConnection, routing.ExchangePerilDirect, queueName, routing.PauseKey, pubsub.QueueTypeTransient)
-
 	state := gamelogic.NewGameState(username)
+
+	pauseQueueName := routing.PauseKey + "." + username
+	err = pubsub.SubscribeJSON(
+		mqConnection,
+		routing.ExchangePerilDirect,
+		pauseQueueName,
+		routing.PauseKey,
+		pubsub.QueueTypeTransient,
+		handlerPause(state))
+
+	if err != nil {
+		log.Fatalf("could not subscribe to %v: %v\n", pauseQueueName, err)
+	}
+
 	for {
 		cmd := gamelogic.GetInput()
 		cmdName := cmd[0]
