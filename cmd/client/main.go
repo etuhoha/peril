@@ -23,6 +23,11 @@ func main() {
 	defer mqConnection.Close()
 	fmt.Println("Connected to MQ.")
 
+	mqChannel, err := mqConnection.Channel()
+	if err != nil {
+		log.Fatalf("could not create MQ channel: %v", err)
+	}
+
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
 		log.Fatalf("could not log in: %v\n", err)
@@ -43,6 +48,15 @@ func main() {
 		log.Fatalf("could not subscribe to %v: %v\n", pauseQueueName, err)
 	}
 
+	moveQueueName := routing.ArmyMovesPrefix + "." + username
+	err = pubsub.SubscribeJSON(
+		mqConnection,
+		routing.ExchangePerilTopic,
+		moveQueueName,
+		routing.ArmyMovesPrefix+".*",
+		pubsub.QueueTypeTransient,
+		handlerMove(state))
+
 	for {
 		cmd := gamelogic.GetInput()
 		cmdName := cmd[0]
@@ -57,8 +71,10 @@ func main() {
 			if err != nil {
 				fmt.Printf("error executing '%v': %v\n", cmd, err)
 			}
-			for _, u := range move.Units {
-				fmt.Printf("Move %v(%v) -> %v\n", u.Rank, u.ID, move.ToLocation)
+
+			err = pubsub.PublishJSON(mqChannel, routing.ExchangePerilTopic, routing.ArmyMovesPrefix+"."+username, move)
+			if err != nil {
+				log.Fatalf("could not send the move: %v", err)
 			}
 		case "status":
 			state.CommandStatus()
