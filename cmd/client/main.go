@@ -55,7 +55,22 @@ func main() {
 		moveQueueName,
 		routing.ArmyMovesPrefix+".*",
 		pubsub.QueueTypeTransient,
-		handlerMove(state))
+		handlerMove(state, mqChannel))
+	if err != nil {
+		log.Fatalf("could not subscribe to %v: %v\n", moveQueueName, err)
+	}
+
+	warQueueName := routing.WarRecognitionsPrefix
+	err = pubsub.SubscribeJSON(
+		mqConnection,
+		routing.ExchangePerilTopic,
+		warQueueName,
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.QueueTypeDurable,
+		handlerWar(state, mqChannel))
+	if err != nil {
+		log.Fatalf("could not subscribe to %v: %v\n", warQueueName, err)
+	}
 
 	for {
 		cmd := gamelogic.GetInput()

@@ -28,16 +28,21 @@ func main() {
 		log.Fatalf("could not create MQ channel: %v", err)
 	}
 
-	_, logQueue, err := pubsub.DeclareAndBind(
-		mqConnection,
+	err = pubsub.SubscribeGob(mqConnection,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
-		pubsub.QueueTypeDurable)
+		pubsub.QueueTypeDurable,
+		func(log routing.GameLog) pubsub.AckType {
+			defer fmt.Print("> ")
+			gamelogic.WriteLog(log)
+			return pubsub.Ack
+		})
+
 	if err != nil {
 		log.Fatalf("could not create log queue: %v", err)
 	}
-	fmt.Printf("Log queue created: '%v'.\n", logQueue.Name)
+	fmt.Printf("Log queue created.\n")
 
 	gamelogic.PrintServerHelp()
 
