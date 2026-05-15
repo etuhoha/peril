@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"log"
-	"time"
 
 	"github.com/etuhoha/peril/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -34,9 +33,8 @@ func PublishGob[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	return ch.PublishWithContext(context.Background(), exchange, key, false, false, pub)
 }
 
-func PublishGameLog(ch *amqp.Channel, username, attacker, message string) AckType {
-	msg := routing.GameLog{Username: username, Message: message, CurrentTime: time.Now()}
-	err := PublishGob(ch, routing.ExchangePerilTopic, routing.GameLogSlug+"."+attacker, msg)
+func PublishGameLog(ch *amqp.Channel, username string, msg routing.GameLog) AckType {
+	err := PublishGob(ch, routing.ExchangePerilTopic, routing.GameLogSlug+"."+username, msg)
 	if err != nil {
 		log.Printf("logging error: %v", err)
 		return NackRequeue
@@ -133,12 +131,19 @@ func SubscribeGeneric[T any](
 		return err
 	}
 
+	err = channel.Qos(10, 0, false)
+	if err != nil {
+		return err
+	}
+
 	deliveryChan, err := channel.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
 	go func() {
+		defer channel.Close()
+
 		for delivery := range deliveryChan {
 			t, err := unmarshaller(delivery.Body)
 			if err != nil {

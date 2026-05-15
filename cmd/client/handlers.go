@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/etuhoha/peril/internal/gamelogic"
 	"github.com/etuhoha/peril/internal/pubsub"
@@ -49,20 +50,21 @@ func handlerWar(gameState *gamelogic.GameState, mqChan *amqp.Channel) func(gamel
 		defer fmt.Print("> ")
 
 		outcome, winner, loser := gameState.HandleWar(war)
+		msg := routing.GameLog{Username: gameState.GetUsername(), CurrentTime: time.Now()}
 		switch outcome {
 		case gamelogic.WarOutcomeNotInvolved:
 			return pubsub.NackRequeue
 		case gamelogic.WarOutcomeNoUnits:
 			return pubsub.NackDiscard
 		case gamelogic.WarOutcomeOpponentWon:
-			message := fmt.Sprintf("%v won a war against %v", winner, loser)
-			return pubsub.PublishGameLog(mqChan, gameState.GetUsername(), war.Attacker.Username, message)
+			msg.Message = fmt.Sprintf("%v won a war against %v", winner, loser)
+			return pubsub.PublishGameLog(mqChan, war.Attacker.Username, msg)
 		case gamelogic.WarOutcomeYouWon:
-			message := fmt.Sprintf("%v won a war against %v", winner, loser)
-			return pubsub.PublishGameLog(mqChan, gameState.GetUsername(), war.Attacker.Username, message)
+			msg.Message = fmt.Sprintf("%v won a war against %v", winner, loser)
+			return pubsub.PublishGameLog(mqChan, war.Attacker.Username, msg)
 		case gamelogic.WarOutcomeDraw:
-			message := fmt.Sprintf("A war between %v and %v resulted in a draw", winner, loser)
-			return pubsub.PublishGameLog(mqChan, gameState.GetUsername(), war.Attacker.Username, message)
+			msg.Message = fmt.Sprintf("A war between %v and %v resulted in a draw", winner, loser)
+			return pubsub.PublishGameLog(mqChan, war.Attacker.Username, msg)
 		}
 
 		log.Printf("unknown outcome %v", outcome)

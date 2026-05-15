@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/etuhoha/peril/internal/gamelogic"
 	"github.com/etuhoha/peril/internal/pubsub"
@@ -96,7 +98,22 @@ func main() {
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
-			fmt.Println("Spamming not allowed yet")
+			if len(cmd) < 2 {
+				fmt.Printf("missing spam count\n")
+				continue
+			}
+
+			count, err := strconv.Atoi(cmd[1])
+			if err != nil {
+				fmt.Printf("bad spam count format: %v\n", cmd[1])
+				continue
+			}
+
+			for i := 0; i < count; i++ {
+				msg := gamelogic.GetMaliciousLog()
+				gl := routing.GameLog{Username: username, Message: msg, CurrentTime: time.Now()}
+				pubsub.PublishGameLog(mqChannel, username, gl)
+			}
 		case "quit":
 			gamelogic.PrintQuit()
 			os.Exit(0)

@@ -34,7 +34,7 @@ func main() {
 		routing.GameLogSlug+".*",
 		pubsub.QueueTypeDurable,
 		func(log routing.GameLog) pubsub.AckType {
-			defer fmt.Print("> ")
+			// defer fmt.Print("> ")
 			gamelogic.WriteLog(log)
 			return pubsub.Ack
 		})
@@ -47,9 +47,14 @@ func main() {
 	gamelogic.PrintServerHelp()
 
 	for {
-		input := gamelogic.GetInput()
-		cmd := input[0]
-		switch cmd {
+		cmd := gamelogic.GetInput()
+		// fmt.Printf("read '%v'\n", cmd)
+		if len(cmd) < 1 {
+			continue
+		}
+
+		cmdName := cmd[0]
+		switch cmdName {
 		case "pause":
 			fmt.Printf("Sending pause message...\n")
 			err = pubsub.PublishJSON(mqChannel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{IsPaused: true})
@@ -66,7 +71,7 @@ func main() {
 			fmt.Printf("Stopping Peril server...\n")
 			os.Exit(0)
 		default:
-			fmt.Printf("unknown command '%v'\n", cmd)
+			fmt.Printf("unknown command '%v'\n", cmdName)
 		}
 	}
 }
